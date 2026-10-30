@@ -63,7 +63,10 @@ npm run build    # 生成 dist/thechosen-dualsub.user.js
 ```bash
 node scripts/fetch-corpus.js                 # 下载全部字幕到 corpus/，默认 zh-CN,zh-TW,yue-hk,en
 node scripts/analyze-corpus.js --term 约拿    # 检查词表覆盖，或查看某个词的上下文
+node scripts/convert-corpus.js               # 生成思高本用语的字幕到 converted/（本地），并更新每集改动清单
 ```
+
+转换后的字幕仍是官方字幕的演绎作品，同样只保存在本地。仓库里公开的是 [每集改动清单](docs/changes/zh-CN.md)：只列词条和替换次数，不含台词。
 
 研究结论见 [docs/research.md](docs/research.md)。
 
