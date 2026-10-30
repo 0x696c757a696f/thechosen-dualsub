@@ -6,7 +6,7 @@
 // @match        https://watch.thechosen.tv/*
 // @run-at       document-start
 // @require      https://raw.githubusercontent.com/0x696c757a696f/thechosen-dualsub/main/dist/converter.js?v=01eec1d9f3
-// @resource     terms https://raw.githubusercontent.com/0x696c757a696f/thechosen-dualsub/main/dist/terms.json?v=f316cc82e2
+// @resource     terms https://raw.githubusercontent.com/0x696c757a696f/thechosen-dualsub/main/dist/terms.json?v=c9d2b5e1d9
 // @grant        GM_xmlhttpRequest
 // @grant        GM.xmlHttpRequest
 // @grant        GM_getResourceText

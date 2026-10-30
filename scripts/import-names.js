@@ -50,7 +50,8 @@ data.terms = data.terms.filter(t => t.src !== SRC && t.src !== PROTECT_SRC);
 // ---- 读取对照表，每个和合本译名取替换次数最多的思高本译名 ----
 const best = new Map();   // p → { c, n }
 for (const line of fs.readFileSync(tsv, 'utf8').split(/\r?\n/).slice(1)) {
-  const [p, c, n] = line.split('\t').map(s => (s || '').trim());
+  // 对照表里混用了 ‧ ． • 、 等间隔号，统一为「·」
+  const [p, c, n] = line.split('\t').map(s => (s || '').trim().replace(/[‧．•、]/g, '·'));
   if (!p || !c || p === c) continue;
   const cur = best.get(p);
   if (!cur || +n > cur.n) best.set(p, { c, n: +n || 0 });
