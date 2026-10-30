@@ -9,7 +9,9 @@
 
 支持 Tampermonkey、Violentmonkey、FireMonkey（Firefox）。
 
-安装 [`dist/thechosen-dualsub.user.js`](dist/thechosen-dualsub.user.js)。Tampermonkey 首次运行时会询问能否访问 `cdn.thechosen.media` 和 `api.watch.thechosen.tv`，选「总是允许」。
+安装 [`dist/thechosen-dualsub.user.js`](https://raw.githubusercontent.com/0x696c757a696f/thechosen-dualsub/main/dist/thechosen-dualsub.user.js)。Tampermonkey 首次运行时会询问能否访问 `cdn.thechosen.media`、`api.watch.thechosen.tv` 和 `raw.githubusercontent.com`，选「总是允许」。
+
+脚本本身不含词条：转换器 `dist/converter.js` 用 `@require` 引入，词表 `dist/terms.json` 用 `@resource` 引入；网址带内容哈希，词表更新后随脚本更新一起重新下载。脚本管理器读不到资源时，会直接从 GitHub 下载 `terms.json`。
 
 打开任意一集，鼠标移到播放器上，右上角点「双字幕」打开设置：
 
@@ -56,7 +58,7 @@ npm test         # 运行 tests/cases.json 里的用例
 npm run build    # 生成 dist/thechosen-dualsub.user.js
 ```
 
-`src/userscript.js` 是脚本源码，构建时注入词表和转换器。不要直接改 `dist/`。
+`src/userscript.js` 是脚本源码，构建时只填入版本号和外部文件的网址；`dist/` 由构建生成，不要直接改。
 
 字幕语料只保存在本地（字幕有版权，`corpus/` 已 gitignore）：
 
@@ -74,13 +76,13 @@ node scripts/convert-corpus.js               # 生成思高本用语的字幕到
 
 ## 数据来源
 
-`data/terms.json` 约 2700 条，分两部分：
+`data/terms.json` 约 2500 条，分两部分：
 
 - **人工审核**（约 270 条）：神名、宗徒、术语、经书名，以及剧中字幕实际出现的人名地名，逐条在全部字幕语料上检查过上下文。
-- **导入**（`"src": "cuv-sigao"`，约 2280 条）：圣经人名地名，来自 wangpei 的 [baibanbao/cuv-with-sigao-names](https://github.com/baibanbao/cuv-with-sigao-names) 的 `译名对照.tsv`，感谢原作者的整理。由 `scripts/import-names.js` 导入：
+- **导入**（`"src": "cuv-sigao"`，约 2230 条）：圣经人名地名，来自 wangpei 的 [baibanbao/cuv-with-sigao-names](https://github.com/baibanbao/cuv-with-sigao-names) 的 `译名对照.tsv`，感谢原作者的整理。由 `scripts/import-names.js` 导入：
   - 单字、常用普通词（按 [jieba](https://github.com/fxsjy/jieba) 词典判断，如「荷兰」「以来」）不收；
   - 一名多译时取替换次数最多的写法；
-  - 会被误改的常用词自动加为保护词（`"src": "common-word"`，如「巴勒斯坦」「西门子」「全神贯注」）。
+  - 会改错常用词的译名不收（如「巴勒」会改错「巴勒斯坦」）。
 
 ```bash
 node scripts/import-names.js 译名对照.tsv --wordlist jieba/dict.txt   # 重新导入（结果可重复）

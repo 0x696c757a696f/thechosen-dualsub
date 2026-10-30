@@ -1,14 +1,21 @@
 // ==UserScript==
 // @name         The Chosen 双字幕 (Dual Subtitles)
 // @namespace    thechosen-dualsub
-// @version      1.3.0
+// @version      @@VERSION@@
 // @description  在 watch.thechosen.tv 上同时显示两种语言的字幕，可分别调节语言、大小、颜色、背景、偏移等；中文字幕可转换为天主教（思高本）用语
 // @match        https://watch.thechosen.tv/*
 // @run-at       document-start
+// @require      @@BASE@@/converter.js?v=@@HASH_CONVERTER@@
+// @resource     terms @@BASE@@/terms.json?v=@@HASH_TERMS@@
 // @grant        GM_xmlhttpRequest
 // @grant        GM.xmlHttpRequest
+// @grant        GM_getResourceText
+// @grant        GM.getResourceText
 // @connect      cdn.thechosen.media
 // @connect      api.watch.thechosen.tv
+// @connect      raw.githubusercontent.com
+// @updateURL    @@BASE@@/thechosen-dualsub.user.js
+// @downloadURL  @@BASE@@/thechosen-dualsub.user.js
 // ==/UserScript==
 
 (() => {
@@ -33,28 +40,62 @@
   };
   const settings = load();
 
-  // ---------- 术语转换（构建时由 scripts/build.js 注入词表与转换器） ----------
-  const TERMS = /* @@TERMS@@ */ { terms: [] };
-  const { createConverter, parseCustom } = (() => {
-    const module = { exports: {} };
-    /* @@CONVERTER@@ */
-    return module.exports;
-  })();
+  // ---------- 术语转换 ----------
+  // 转换器由 @require 引入（全局 ChristianTermConverter），词表由 @resource 引入，
+  // 都放在 GitHub 上，脚本本身不含词条
+  const TERMS_URL = '@@BASE@@/terms.json';
+  const Conv = typeof ChristianTermConverter !== 'undefined' ? ChristianTermConverter : null;
+
+  // 依次尝试 Tampermonkey 的 GM_getResourceText、FireMonkey / Violentmonkey 的 GM.getResourceText，
+  // 都不行就直接从 GitHub 下载
+  let termsPromise = null;
+  function loadTerms() {
+    if (!termsPromise) {
+      termsPromise = (async () => {
+        try {
+          if (typeof GM_getResourceText === 'function') {
+            const s = GM_getResourceText('terms');
+            if (s) return JSON.parse(s);
+          }
+        } catch {}
+        try {
+          if (typeof GM !== 'undefined' && GM && typeof GM.getResourceText === 'function') {
+            const s = await GM.getResourceText('terms');
+            if (s) return JSON.parse(s);
+          }
+        } catch {}
+        return JSON.parse(await getText(TERMS_URL));
+      })().catch(e => {
+        console.warn('[dualsub] 词表加载失败', e);
+        setStatus(`词表加载失败，中文用词不转换：${e.message}`);
+        termsPromise = null;
+        return null;
+      });
+    }
+    return termsPromise;
+  }
 
   let converter = null, converterKey = null;
-  function getConverter() {
+  async function getConverter() {
+    if (settings.convert === 'off') return null;
+    if (!Conv) {
+      setStatus('转换器（converter.js）没有加载，中文用词不转换');
+      return null;
+    }
+    const terms = await loadTerms();
+    if (!terms) return null;
     const key = settings.convert + '\u0000' + settings.custom;
     if (key !== converterKey) {
       converterKey = key;
-      converter = settings.convert === 'off' ? null
-        : createConverter(TERMS, settings.convert, parseCustom(settings.custom));
+      converter = Conv.createConverter(terms, settings.convert, Conv.parseCustom(settings.custom));
     }
     return converter;
   }
 
   // 只转换中文字幕（目前词表为简体）
-  function convertCues(list, lang) {
-    const conv = /^zh/i.test(lang) && getConverter();
+  async function convertCues(list, lang) {
+    if (!/^zh/i.test(lang)) return list;
+    const conv = await getConverter();
     return conv ? list.map(c => ({ ...c, text: conv(c.text) })) : list;
   }
 
@@ -249,9 +290,9 @@
       }
       p = cueCache.get(lang);
     }
-    const list = await p;
+    const list = await convertCues(await p, lang);
     if (url !== masterUrl || settings.tracks[i].lang !== lang) return;
-    cues[i] = convertCues(list, lang);
+    cues[i] = list;
     invalidate();
   }
 
@@ -491,7 +532,7 @@
           <option value="off"${settings.convert === 'off' ? ' selected' : ''}>不转换（官方和合本）</option>
         </select></div>
         <div class="hint">自定义词条，每行「原词=新词」，优先于内置表</div>
-        <textarea data-k="custom" placeholder="例如：&#10;伯多禄=伯铎">${esc(settings.custom)}</textarea>
+        <textarea data-k="custom" placeholder="每行一条，例如：&#10;原词=新词">${esc(settings.custom)}</textarea>
       </fieldset>
       <div class="btns"><button type="button" data-act="swap">交换两条</button><button type="button" data-act="reset">恢复默认</button></div>`;
     panel.querySelector('.ds-status').textContent = status;

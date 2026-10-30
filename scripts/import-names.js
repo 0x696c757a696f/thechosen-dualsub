@@ -11,8 +11,8 @@
 // - 是普通常用词的不收：词典里非人名地名且词频 ≥ 20（以来、比赛、南方），或任何词性词频 ≥ 50（荷兰）
 // - 一个和合本译名对应多个思高本译名时，取替换次数最多的
 // - 思高本写法已被其他双向词条使用、或只有一个字时，标为 only: p2c，避免反向转换歧义
-// - 保护词：词典里词频 ≥ 30、包含某个词条、且会被转错的常用词（巴勒斯坦、西门子、圣彼得堡），
-//   自动加为 p2c 方向的保护词；名字后接河、山、城、人、书、福音等圣经语境，或前面是「圣」的除外
+// - 误伤检查：会改错词典里词频 ≥ 30 的常用词（如「加利福尼亚大学」）的导入译名，直接不收；
+//   名字后接河、山、城、人、书、福音等圣经语境，或前面是「圣」的不算误伤
 const fs = require('fs');
 const path = require('path');
 const { createConverter } = require('../lib/converter');
@@ -42,7 +42,7 @@ const root = path.join(__dirname, '..');
 const termsFile = path.join(root, 'data', 'terms.json');
 const data = JSON.parse(fs.readFileSync(termsFile, 'utf8'));
 const SRC = 'cuv-sigao';
-const PROTECT_SRC = 'common-word';
+const PROTECT_SRC = 'common-word';   // 旧版自动生成的保护词，重新导入时清除
 
 // 去掉上一次导入的结果，保证重复运行结果一致
 data.terms = data.terms.filter(t => t.src !== SRC && t.src !== PROTECT_SRC);
@@ -87,36 +87,47 @@ for (const [p, { c }] of [...best].sort((a, b) => b[1].n - a[1].n)) {
   added.push(entry);
 }
 
-// ---- 保护词：会被转错的常用词 ----
+// ---- 误伤检查：导入的译名若会改错常用词（如「加利福尼亚大学」），直接不收这个译名 ----
+// 名字后接河、山、城、人、书、福音等圣经语境，或前面是「圣」的，不算误伤
 const BIBLICAL_AFFIX = /^(河|山|海|湖|城|地|人|书|记|纪|福音|之子|之女|王|家|族|支派|门|谷|泉|井|池|旷野|平原|半岛|沙漠|的)/;
-const all = [...data.terms, ...added];
-const keys = new Set(all.map(t => t.p));
-const convert = createConverter({ terms: all }, 'p2c');
-const protect = [];
-for (const [w, e] of dict) {
-  const L = [...w].length;
-  if (e.f < 30 || L < 3 || keys.has(w) || best.has(w)) continue;
-  if (convert(w) === w) continue;   // 本来就不会被改
-  // 找出 w 里被转换的词条，判断是否处于圣经语境
-  let biblical = false;
-  for (const k of keys) {
-    const i = w.indexOf(k);
-    if (i < 0 || [...k].length < 2) continue;
-    const before = w.slice(0, i), after = w.slice(i + k.length);
-    if ((!after && before === '圣') || (!before && BIBLICAL_AFFIX.test(after))) biblical = true;
+const imported = new Map(added.map(t => [t.p, t]));
+const curatedKeys = new Set(data.terms.map(t => t.p));
+const dropped = new Map();          // 被去掉的导入译名 → 误伤的常用词
+const curatedHits = new Map();      // 人工词条误伤的常用词（只报告，不处理）
+for (let round = 0; round < 5; round++) {
+  const convert = createConverter({ terms: [...data.terms, ...imported.values()] }, 'p2c');
+  let changed = false;
+  for (const [w, e] of dict) {
+    if (e.f < 30 || [...w].length < 3 || best.has(w) || imported.has(w) || curatedKeys.has(w)) continue;
+    const stats = {};
+    if (convert(w, stats) === w) continue;
+    for (const k of Object.keys(stats)) {
+      const i = w.indexOf(k);
+      const before = w.slice(0, i), after = w.slice(i + k.length);
+      if ((!after && before === '圣') || (!before && BIBLICAL_AFFIX.test(after))) continue;
+      if (imported.has(k)) {
+        imported.delete(k);
+        dropped.set(k, w);
+        changed = true;
+      } else if (curatedKeys.has(k)) {
+        (curatedHits.get(k) || curatedHits.set(k, []).get(k)).push(w);
+      }
+    }
   }
-  if (!biblical) protect.push({ p: w, c: w, cat: 'keep', only: 'p2c', src: PROTECT_SRC });
+  if (!changed) break;
 }
+const kept = added.filter(t => imported.has(t.p));
 
-console.log(`对照表 ${best.size} 个译名：新增 ${added.length}，已有 ${skipped.existing}，单字 ${skipped.single}，` +
-  `语料中出现 ${skipped.corpus.length}，常用普通词 ${skipped.common.length}`);
+console.log(`对照表 ${best.size} 个译名：新增 ${kept.length}，已有 ${skipped.existing}，单字 ${skipped.single}，` +
+  `语料中出现 ${skipped.corpus.length}，常用普通词 ${skipped.common.length}，误伤常用词 ${dropped.size}`);
 console.log(`常用普通词（不收）：${skipped.common.join(' ')}`);
-console.log(`新增中标为单向的：${added.filter(t => t.only).length}`);
-console.log(`保护词 ${protect.length} 个：${protect.map(t => t.p).join(' ')}`);
+console.log(`误伤常用词（不收）：${[...dropped].map(([k, w]) => `${k}(${w})`).join(' ')}`);
+console.log(`新增中标为单向的：${kept.filter(t => t.only).length}`);
+console.log(`人工词条可能误伤的常用词（仅供参考）：${[...curatedHits].map(([k, ws]) => `${k}: ${[...new Set(ws)].slice(0, 6).join('、')}`).join('；')}`);
 
 if (!dry) {
   data.categories.bible = data.categories.bible || '圣经人名地名（导入自 cuv-with-sigao-names 译名对照表）';
-  data.terms.push(...added, ...protect);
+  data.terms.push(...kept);
   fs.writeFileSync(termsFile, JSON.stringify(data, null, 2)
     .replace(/\{\n\s+("p": [^\n]+)\n((?:\s+"[a-zA-Z]+": [^\n]+\n)+?)\s+\}/g,
       (m, a, b) => '{ ' + a + ' ' + b.trim().split(/\n\s+/).join(' ') + ' }') + '\n');

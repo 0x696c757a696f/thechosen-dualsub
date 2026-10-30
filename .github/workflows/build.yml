@@ -24,6 +24,9 @@ jobs:
 
       - name: Build userscript
         run: npm run build
+        env:
+          # 附加到版本号末尾（如 1.4.0.12），让脚本管理器检测到更新
+          BUILD_NUMBER: ${{ github.run_number }}
 
       - name: Syntax check
         run: node --check dist/thechosen-dualsub.user.js
@@ -31,7 +34,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: userscript
-          path: dist/thechosen-dualsub.user.js
+          path: dist/
 
       # main 分支上把构建产物提交回仓库，供油猴的 @updateURL 自动更新
       - name: Commit dist
