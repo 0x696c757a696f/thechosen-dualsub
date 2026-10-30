@@ -58,6 +58,15 @@ npm run build    # 生成 dist/thechosen-dualsub.user.js
 
 `src/userscript.js` 是脚本源码，构建时注入词表和转换器。不要直接改 `dist/`。
 
+字幕语料只保存在本地（字幕有版权，`corpus/` 已 gitignore）：
+
+```bash
+node scripts/fetch-corpus.js                 # 下载全部字幕到 corpus/，默认 zh-CN,zh-TW,yue-hk,en
+node scripts/analyze-corpus.js --term 约拿    # 检查词表覆盖，或查看某个词的上下文
+```
+
+研究结论见 [docs/research.md](docs/research.md)。
+
 推送到 `main` 后，GitHub Actions 会运行测试、构建，并把更新后的 `dist/` 提交回仓库。
 
 ## 数据来源
