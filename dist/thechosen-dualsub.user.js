@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         The Chosen 双字幕 (Dual Subtitles)
 // @namespace    thechosen-dualsub
-// @version      1.4.0
+// @version      1.4.0.1
 // @description  在 watch.thechosen.tv 上同时显示两种语言的字幕，可分别调节语言、大小、颜色、背景、偏移等；中文字幕可转换为天主教（思高本）用语
 // @match        https://watch.thechosen.tv/*
 // @run-at       document-start
