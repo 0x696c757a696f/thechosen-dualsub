@@ -74,4 +74,14 @@ node scripts/convert-corpus.js               # 生成思高本用语的字幕到
 
 ## 数据来源
 
-人名、地名已与 [baibanbao/cuv-with-sigao-names](https://github.com/baibanbao/cuv-with-sigao-names) 的 `译名对照.tsv` 逐条核对。该仓库未声明许可证，本仓库没有复制其数据。
+`data/terms.json` 约 2700 条，分两部分：
+
+- **人工审核**（约 270 条）：神名、宗徒、术语、经书名，以及剧中字幕实际出现的人名地名，逐条在全部字幕语料上检查过上下文。
+- **导入**（`"src": "cuv-sigao"`，约 2280 条）：圣经人名地名，来自 wangpei 的 [baibanbao/cuv-with-sigao-names](https://github.com/baibanbao/cuv-with-sigao-names) 的 `译名对照.tsv`，感谢原作者的整理。由 `scripts/import-names.js` 导入：
+  - 单字、常用普通词（按 [jieba](https://github.com/fxsjy/jieba) 词典判断，如「荷兰」「以来」）不收；
+  - 一名多译时取替换次数最多的写法；
+  - 会被误改的常用词自动加为保护词（`"src": "common-word"`，如「巴勒斯坦」「西门子」「全神贯注」）。
+
+```bash
+node scripts/import-names.js 译名对照.tsv --wordlist jieba/dict.txt   # 重新导入（结果可重复）
+```
