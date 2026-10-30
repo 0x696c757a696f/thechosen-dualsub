@@ -1,0 +1,48 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Test
+        run: npm test
+
+      - name: Build userscript
+        run: npm run build
+
+      - name: Syntax check
+        run: node --check dist/thechosen-dualsub.user.js
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: userscript
+          path: dist/thechosen-dualsub.user.js
+
+      # main 分支上把构建产物提交回仓库，供油猴的 @updateURL 自动更新
+      - name: Commit dist
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          if git diff --quiet -- dist; then
+            echo "dist unchanged"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add dist
+          git commit -m "build: update dist [skip ci]"
+          git push
